@@ -1,1 +1,292 @@
 
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Wordle FR</title>
+
+<style>
+:root {
+  --bg: #121213;
+  --fg: #ffffff;
+  --absent: #3a3a3c;
+  --present: #b59f3b;
+  --correct: #538d4e;
+  --border: #565758;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  display: flex;
+  justify-content: center;
+}
+
+main {
+  max-width: 420px;
+  padding: 1rem;
+  text-align: center;
+}
+
+h1 {
+  letter-spacing: 0.1em;
+  margin-bottom: 1rem;
+}
+
+#grid {
+  display: grid;
+  grid-template-rows: repeat(6, 1fr);
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+}
+
+.cell {
+  border: 2px solid var(--border);
+  height: 3rem;
+  font-size: 1.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cell.correct { background: var(--correct); border: none; }
+.cell.present { background: var(--present); border: none; }
+.cell.absent  { background: var(--absent);  border: none; }
+
+#keyboard {
+  display: grid;
+  grid-template-rows: repeat(3, auto);
+  gap: 0.4rem;
+}
+
+.krow {
+  display: flex;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.key {
+  background: var(--border);
+  color: white;
+  border-radius: 4px;
+  padding: 0.6rem;
+  min-width: 2rem;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+}
+
+.key.wide { min-width: 3.5rem; }
+.key.correct { background: var(--correct); }
+.key.present { background: var(--present); }
+.key.absent  { background: var(--absent); }
+
+#message {
+  height: 1.5rem;
+  margin-top: 0.5rem;
+}
+</style>
+</head>
+
+<body>
+<main>
+  <h1>WORDLE 🇫🇷</h1>
+
+  <div id="grid"></div>
+
+  <div id="keyboard"></div>
+
+  <div id="message"></div>
+</main>
+
+<script>
+/* =====================
+   CONFIGURATION
+===================== */
+
+// 🔑 Mot à trouver (modifiable ici)
+const SECRET = "ROUBY";
+
+// 📚 Dictionnaire (mots de 5 lettres, sans accents)
+const DICTIONARY = [
+  "ROUBY","ROUGE","BLANC","NOIRE","VERTE","JAUNE","BRUIT",
+  "TABLE","CHIEN","PLUIE","NUAGE","FLEUR","PIANO","LIVRE",
+  "OMBRE","ECRAN","FRUIT","SABLE","MERCI","RIVEE","VITES",
+  "LUMEN","CABLE","PIXEL"
+];
+
+/* =====================
+   ÉTAT DU JEU
+===================== */
+
+const MAX_TRIES = 6;
+let currentRow = 0;
+let currentCol = 0;
+let grid = Array.from({length: MAX_TRIES}, () => Array(5).fill(""));
+let finished = false;
+
+/* =====================
+   INITIALISATION
+===================== */
+
+const gridEl = document.getElementById("grid");
+const messageEl = document.getElementById("message");
+
+for (let r = 0; r < MAX_TRIES; r++) {
+  const row = document.createElement("div");
+  row.className = "row";
+  for (let c = 0; c < 5; c++) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    row.appendChild(cell);
+  }
+  gridEl.appendChild(row);
+}
+
+const keyboardLayout = [
+  "AZERTYUIOP",
+  "QSDFGHJKLM",
+  "↵WXCVBN⌫"
+];
+
+const keyboardEl = document.getElementById("keyboard");
+
+keyboardLayout.forEach(line => {
+  const row = document.createElement("div");
+  row.className = "krow";
+  [...line].forEach(k => {
+    const key = document.createElement("div");
+    key.className = "key";
+    key.textContent = k;
+    if (k === "↵" || k === "⌫") key.classList.add("wide");
+    key.onclick = () => handleKey(k);
+    row.appendChild(key);
+  });
+  keyboardEl.appendChild(row);
+});
+
+/* =====================
+   LOGIQUE
+===================== */
+
+function handleKey(k) {
+  if (finished) return;
+
+  if (k === "⌫") {
+    if (currentCol > 0) {
+      currentCol--;
+      grid[currentRow][currentCol] = "";
+      updateGrid();
+    }
+  }
+  else if (k === "↵") {
+    submitGuess();
+  }
+  else if (currentCol < 5 && /^[A-Z]$/.test(k)) {
+    grid[currentRow][currentCol] = k;
+    currentCol++;
+    updateGrid();
+  }
+}
+
+document.addEventListener("keydown", e => {
+  let k = e.key.toUpperCase();
+  if (k === "ENTER") k = "↵";
+  if (k === "BACKSPACE") k = "⌫";
+  handleKey(k);
+});
+
+function updateGrid() {
+  [...gridEl.children].forEach((rowEl, r) => {
+    [...rowEl.children].forEach((cell, c) => {
+      cell.textContent = grid[r][c];
+    });
+  });
+}
+
+function submitGuess() {
+  const word = grid[currentRow].join("");
+  if (word.length < 5) {
+    showMessage("Mot incomplet");
+    return;
+  }
+  if (!DICTIONARY.includes(word)) {
+    showMessage("Mot inconnu");
+    return;
+  }
+
+  evaluate(word);
+
+  if (word === SECRET) {
+    showMessage("🎉 Bravo !");
+    finished = true;
+    return;
+  }
+
+  currentRow++;
+  currentCol = 0;
+
+  if (currentRow === MAX_TRIES) {
+    showMessage("Perdu 😢 — " + SECRET);
+    finished = true;
+  }
+}
+
+function evaluate(word) {
+  const secret = SECRET.split("");
+  const rowEl = gridEl.children[currentRow];
+
+  const count = {};
+  secret.forEach(l => count[l] = (count[l] || 0) + 1);
+
+  // Correct
+  for (let i = 0; i < 5; i++) {
+    if (word[i] === secret[i]) {
+      rowEl.children[i].classList.add("correct");
+      markKey(word[i], "correct");
+      count[word[i]]--;
+    }
+  }
+
+  // Present / Absent
+  for (let i = 0; i < 5; i++) {
+    if (rowEl.children[i].classList.length > 1) continue;
+    if (count[word[i]] > 0) {
+      rowEl.children[i].classList.add("present");
+      markKey(word[i], "present");
+      count[word[i]]--;
+    } else {
+      rowEl.children[i].classList.add("absent");
+      markKey(word[i], "absent");
+    }
+  }
+}
+
+function markKey(letter, state) {
+  [...document.querySelectorAll(".key")]
+    .filter(k => k.textContent === letter)
+    .forEach(k => {
+      if (k.classList.contains("correct")) return;
+      if (k.classList.contains("present") && state === "absent") return;
+      k.classList.remove("present", "absent");
+      k.classList.add(state);
+    });
+}
+
+function showMessage(msg) {
+  messageEl.textContent = msg;
+}
+</script>
+</body>
+</html>
