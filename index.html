@@ -126,6 +126,20 @@ const DICTIONARY = [
   "LUMEN","CABLE","PIXEL"
 ];
 
+
+let DICTIONARY = [];
+
+async function loadDictionary() {
+  try {
+    const res = await fetch("words.json");
+    if (!res.ok) throw new Error("fetch failed");
+    DICTIONARY = await res.json();
+    console.log(`📚 ${DICTIONARY.length} mots chargés`);
+  } catch (e) {
+    alert("Impossible de charger le dictionnaire");
+  }
+}
+
 /* =====================
    ÉTAT DU JEU
 ===================== */
@@ -215,8 +229,16 @@ function updateGrid() {
   });
 }
 
+function normalize(word) {
+  return word
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
+
 function submitGuess() {
-  const word = grid[currentRow].join("");
+    const word = normalize(grid[currentRow].join(""));
   if (word.length < 5) {
     showMessage("Mot incomplet");
     return;
